@@ -8,6 +8,10 @@
 * [Step 4 Extract and integrate data](#step-4-extract-and-integrate-data)
 * [Note](#note)
 
+## General Info
+* There are two kind doc which have the same code (.ipynb and .py). Please view the Flower_crawling.py doc if you are facing the problem of viewing the Flower_crawling.ipynb doc.
+* productData.csv is the product data output
+
 ## Task
 Use Python to scrape all product data(name, price, variant, availability) under this category: https://www.yates.com.au/shop/seeds/flowers/
     
