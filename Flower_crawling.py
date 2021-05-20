@@ -48,7 +48,7 @@ def getProductByCollection(url, lastElementCursor):
     req = requests.post(url, headers=GRAPHQL_QUERY_HEADERS, json=payload)
     return json.loads(req.content)
 
-# Backend server queries
+# Backend server queries for offline products IDs
 def getOfflineProductsIds(url):
     payload = {
         'criteria': [],
@@ -62,6 +62,7 @@ def getOfflineProductsIds(url):
     req = requests.post(url, headers=BACKEND_SERVER_QUERY_HEADERS, json = payload)
     return json.loads(req.content)
 
+# Backend server queries
 def getProductsPaging(url, page, pagingItems):
     payload = {
         'criteria': [],
@@ -93,8 +94,8 @@ def extractAttributesFromGraphqlResponse(onlineProduct):
         onlineProduct['node']['variants']['edges']
     )
 
-# Extract onlineProduct attributes from Backend Server response
-def extractAttributesFromBackendServerResponse(onlineProduct):
+# Extract onlineProduct attributes
+def extractAttributes(onlineProduct):
     return (
         onlineProduct['title'],
         onlineProduct['quantityAvailable'], 
@@ -103,8 +104,8 @@ def extractAttributesFromBackendServerResponse(onlineProduct):
         onlineProduct['tags']
     )
 
-# Assemble paging items in request payload
-def toPageItem(cursor, itemType, value): 
+# Generate paging items in request payload
+def toPagingItem(cursor, itemType, value): 
     if itemType == 'Online':
         return {
             'cursor': cursor,
@@ -121,7 +122,7 @@ def toPageItem(cursor, itemType, value):
 def handleIncompleteRow(data):
     rows = []
     for onlineProduct in data:
-        name, available, maxPrice, minPrice, tags = extractAttributesFromBackendServerResponse(onlineProduct)
+        name, available, maxPrice, minPrice, tags = extractAttributes(onlineProduct)
         numVariants = len(available)
         row = normaliseCols('', name, minPrice, maxPrice, numVariants, available, '', '', '', '', tags)
         rows.append(row)
@@ -151,7 +152,7 @@ def handleVariant(variant):
 # Process online products
 def processOnlineProducts(url, writer):
     lastElementCursor = ""
-    hasNextPage = getProductByCollection(url, lastElementCursor)['data']['collectionByHandle']['products']['pageInfo']['hasNextPage']
+    hasNextPage = True
     page = 1
     while(hasNextPage):
         productGraphQlInfo = {}
@@ -161,7 +162,7 @@ def processOnlineProducts(url, writer):
         for p in products['edges']:
             quantityAvailable = []
             name, title, maxPrice, minPrice, tags, variants = extractAttributesFromGraphqlResponse(p)
-            pagingItemsOnline.append(toPageItem(p['cursor'], 'Online', name))
+            pagingItemsOnline.append(toPagingItem(p['cursor'], 'Online', name))
             for v in variants:
                 quantityAvailable.append(str(v['node']['quantityAvailable']))
             productGraphQlInfo[name] = {'title': title, 'quantityAvailable': quantityAvailable, 'maxPrice': maxPrice, 'minPrice': minPrice, 'tags': tags}
@@ -174,7 +175,7 @@ def processOnlineProducts(url, writer):
 def processOfflineProducts(offlineProductIds, writer):
     pagingItemsOffline = []
     for id in offlineProductIds:
-        pagingItemsOffline.append(toPageItem('', 'Offline', id))
+        pagingItemsOffline.append(toPagingItem('', 'Offline', id))
     iter = math.ceil(len(offlineProductIds) / PAGE_SIZE)
     for i in range(0, iter):
         offlineProducts = getProductsPaging(PRODUCTS_PAGING_URL, i+1, pagingItemsOffline)
@@ -183,7 +184,7 @@ def processOfflineProducts(offlineProductIds, writer):
         
 # Output
 def output(pagingItems, productGraphQlInfo):
-    isOfflineProductList = productGraphQlInfo is None;
+    isOfflineProductList = productGraphQlInfo is None
     rows = []
     for item in pagingItems:
         row = []
@@ -193,7 +194,7 @@ def output(pagingItems, productGraphQlInfo):
             available, maxPrice, minPrice, tags = ('', '', '', '')
         else:
             onlineProduct = productGraphQlInfo.pop(name.lower())
-            title, available, maxPrice, minPrice, tags = extractAttributesFromBackendServerResponse(onlineProduct)
+            title, available, maxPrice, minPrice, tags = extractAttributes(onlineProduct)
         for variant in variants:
             barcode, seedsPerPack, size, sku = handleVariant(variant)
         row = normaliseCols(id, name, minPrice, maxPrice, numVariants, available, barcode, seedsPerPack, size, sku, tags)
@@ -217,4 +218,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-
